@@ -1,0 +1,594 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Order Management API",
+    "description": "REST API for managing orders with authentication, caching, and external API integration.",
+    "version": "1.0.0",
+    "contact": {
+      "name": "API Support"
+    },
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "host": "localhost:8080",
+  "basePath": "/",
+  "schemes": ["http", "https"],
+  "securityDefinitions": {
+    "BearerAuth": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "description": "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\""
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["health"],
+        "summary": "Health check",
+        "description": "Returns basic health status",
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "example": "ok"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/detail": {
+      "get": {
+        "tags": ["health"],
+        "summary": "Detailed health check",
+        "description": "Returns detailed health status including database and Redis connectivity",
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/HealthResponse"
+            }
+          },
+          "503": {
+            "description": "Service Unavailable",
+            "schema": {
+              "$ref": "#/definitions/HealthResponse"
+            }
+          }
+        }
+      }
+    },
+    "/ready": {
+      "get": {
+        "tags": ["health"],
+        "summary": "Readiness check",
+        "description": "Returns whether the service is ready to accept traffic",
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Ready",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "example": "ready"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Not Ready"
+          }
+        }
+      }
+    },
+    "/live": {
+      "get": {
+        "tags": ["health"],
+        "summary": "Liveness check",
+        "description": "Returns whether the service is alive",
+        "produces": ["application/json"],
+        "responses": {
+          "200": {
+            "description": "Alive",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "example": "alive"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Register a new user",
+        "description": "Creates a new user account and returns a JWT token",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "description": "Registration details",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RegisterInput"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/AuthResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "409": {
+            "description": "Conflict - User already exists",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["auth"],
+        "summary": "Login",
+        "description": "Authenticates a user and returns a JWT token",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "description": "Login credentials",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/LoginInput"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/AuthResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/orders": {
+      "get": {
+        "tags": ["orders"],
+        "summary": "List orders",
+        "description": "Returns a paginated list of orders for the authenticated user",
+        "security": [{"BearerAuth": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "type": "integer",
+            "default": 20,
+            "description": "Maximum number of orders to return"
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "type": "integer",
+            "default": 0,
+            "description": "Number of orders to skip"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/OrderListResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": ["orders"],
+        "summary": "Create order",
+        "description": "Creates a new order for the authenticated user",
+        "security": [{"BearerAuth": []}],
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "description": "Order details",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/CreateOrderInput"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "schema": {
+              "$ref": "#/definitions/Order"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/orders/{id}": {
+      "get": {
+        "tags": ["orders"],
+        "summary": "Get order by ID",
+        "description": "Returns a single order by ID (must belong to authenticated user)",
+        "security": [{"BearerAuth": []}],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "type": "string",
+            "required": true,
+            "description": "Order ID"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Order"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "/api/orders/{id}/status": {
+      "patch": {
+        "tags": ["orders"],
+        "summary": "Update order status",
+        "description": "Updates the status of an order (must belong to authenticated user)",
+        "security": [{"BearerAuth": []}],
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "type": "string",
+            "required": true,
+            "description": "Order ID"
+          },
+          {
+            "in": "body",
+            "name": "body",
+            "description": "New status",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/UpdateStatusInput"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/Order"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Not Found",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "RegisterInput": {
+      "type": "object",
+      "required": ["email", "password"],
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "example": "user@example.com"
+        },
+        "password": {
+          "type": "string",
+          "minLength": 6,
+          "example": "password123"
+        },
+        "name": {
+          "type": "string",
+          "example": "John Doe"
+        }
+      }
+    },
+    "LoginInput": {
+      "type": "object",
+      "required": ["email", "password"],
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "example": "user@example.com"
+        },
+        "password": {
+          "type": "string",
+          "example": "password123"
+        }
+      }
+    },
+    "AuthResponse": {
+      "type": "object",
+      "properties": {
+        "user": {
+          "$ref": "#/definitions/User"
+        },
+        "token": {
+          "type": "string",
+          "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        }
+      }
+    },
+    "User": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "example": "550e8400-e29b-41d4-a716-446655440000"
+        },
+        "email": {
+          "type": "string",
+          "example": "user@example.com"
+        },
+        "name": {
+          "type": "string",
+          "example": "John Doe"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "CreateOrderInput": {
+      "type": "object",
+      "required": ["customer_name", "total_amount"],
+      "properties": {
+        "customer_name": {
+          "type": "string",
+          "example": "John Doe"
+        },
+        "total_amount": {
+          "type": "number",
+          "format": "double",
+          "minimum": 0,
+          "example": 99.99
+        }
+      }
+    },
+    "UpdateStatusInput": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["pending", "confirmed", "shipped", "delivered", "cancelled"],
+          "example": "confirmed"
+        }
+      }
+    },
+    "Order": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "example": "550e8400-e29b-41d4-a716-446655440000"
+        },
+        "user_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "customer_name": {
+          "type": "string",
+          "example": "John Doe"
+        },
+        "total_amount": {
+          "type": "number",
+          "format": "double",
+          "example": 99.99
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "confirmed", "shipped", "delivered", "cancelled"],
+          "example": "pending"
+        },
+        "external_ref": {
+          "type": "string",
+          "example": "EXT-12345678-1234567890"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "OrderListResponse": {
+      "type": "object",
+      "properties": {
+        "orders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Order"
+          }
+        },
+        "total": {
+          "type": "integer",
+          "example": 100
+        },
+        "limit": {
+          "type": "integer",
+          "example": 20
+        },
+        "offset": {
+          "type": "integer",
+          "example": 0
+        }
+      }
+    },
+    "HealthResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["healthy", "degraded", "unhealthy"],
+          "example": "healthy"
+        },
+        "version": {
+          "type": "string",
+          "example": "1.0.0"
+        },
+        "uptime": {
+          "type": "string",
+          "example": "2h30m15s"
+        },
+        "go_version": {
+          "type": "string",
+          "example": "go1.23"
+        },
+        "components": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/HealthStatus"
+          }
+        }
+      }
+    },
+    "HealthStatus": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["healthy", "unhealthy"]
+        },
+        "latency": {
+          "type": "string",
+          "example": "1.5ms"
+        },
+        "error": {
+          "type": "string"
+        }
+      }
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string",
+              "example": "VALIDATION_ERROR"
+            },
+            "message": {
+              "type": "string",
+              "example": "Invalid input data"
+            },
+            "detail": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Authentication endpoints"
+    },
+    {
+      "name": "orders",
+      "description": "Order management endpoints"
+    },
+    {
+      "name": "health",
+      "description": "Health check endpoints"
+    }
+  ]
+}
