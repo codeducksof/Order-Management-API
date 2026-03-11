@@ -148,7 +148,38 @@ make build
 
 ## Usage Examples
 
-### Register a User
+### Health Checks
+
+```bash
+# Basic health check
+curl http://localhost:8080/health
+# {"status":"ok"}
+
+# Detailed health (DB + Redis status)
+curl http://localhost:8080/health/detail
+# {
+#   "status": "healthy",
+#   "version": "1.0.0",
+#   "uptime": "1m30s",
+#   "go_version": "go1.23.0",
+#   "components": {
+#     "database": {"status": "healthy", "latency": "1.2ms"},
+#     "redis":    {"status": "healthy", "latency": "0.5ms"}
+#   }
+# }
+
+# Readiness probe
+curl http://localhost:8080/ready
+# {"status":"ready"}
+
+# Liveness probe
+curl http://localhost:8080/live
+# {"status":"alive"}
+```
+
+### Authentication
+
+#### Register
 
 ```bash
 curl -X POST http://localhost:8080/auth/register \
@@ -158,9 +189,17 @@ curl -X POST http://localhost:8080/auth/register \
     "password": "password123",
     "name": "John Doe"
   }'
+# {
+#   "token": "eyJhbGciOiJIUzI1NiIs...",
+#   "user": {
+#     "id": "uuid-...",
+#     "email": "user@example.com",
+#     "name": "John Doe"
+#   }
+# }
 ```
 
-### Login
+#### Login
 
 ```bash
 curl -X POST http://localhost:8080/auth/login \
@@ -169,38 +208,84 @@ curl -X POST http://localhost:8080/auth/login \
     "email": "user@example.com",
     "password": "password123"
   }'
+# {
+#   "token": "eyJhbGciOiJIUzI1NiIs...",
+#   "user": {
+#     "id": "uuid-...",
+#     "email": "user@example.com",
+#     "name": "John Doe"
+#   }
+# }
 ```
 
-Save the `token` from the response for authenticated requests.
+Save the `token` from the response for authenticated requests:
 
-### Create an Order
+```bash
+TOKEN="eyJhbGciOiJIUzI1NiIs..."
+```
+
+### Orders
+
+#### Create Order
 
 ```bash
 curl -X POST http://localhost:8080/api/orders \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <YOUR_TOKEN>" \
+  -H "Authorization: Bearer $TOKEN" \
   -d '{
     "customer_name": "Customer A",
     "total_amount": 199.99
   }'
+# {
+#   "id": "uuid-...",
+#   "user_id": "uuid-...",
+#   "customer_name": "Customer A",
+#   "total_amount": 199.99,
+#   "status": "pending",
+#   "created_at": "2026-03-11T13:47:48Z",
+#   "updated_at": "2026-03-11T13:47:48Z"
+# }
 ```
 
-### List Orders
+#### List Orders
 
 ```bash
-curl -X GET "http://localhost:8080/api/orders?limit=10&offset=0" \
-  -H "Authorization: Bearer <YOUR_TOKEN>"
+curl "http://localhost:8080/api/orders?limit=10&offset=0" \
+  -H "Authorization: Bearer $TOKEN"
+# {
+#   "orders": [...],
+#   "total": 1,
+#   "limit": 10,
+#   "offset": 0
+# }
 ```
 
-### Update Order Status
+#### Get Order by ID
+
+```bash
+curl http://localhost:8080/api/orders/<ORDER_ID> \
+  -H "Authorization: Bearer $TOKEN"
+# {
+#   "id": "uuid-...",
+#   "customer_name": "Customer A",
+#   "total_amount": 199.99,
+#   "status": "pending",
+#   ...
+# }
+```
+
+#### Update Order Status
 
 ```bash
 curl -X PATCH http://localhost:8080/api/orders/<ORDER_ID>/status \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <YOUR_TOKEN>" \
-  -d '{
-    "status": "confirmed"
-  }'
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{"status": "confirmed"}'
+# {
+#   "id": "uuid-...",
+#   "status": "confirmed",
+#   ...
+# }
 ```
 
 Valid statuses: `pending`, `confirmed`, `shipped`, `delivered`, `cancelled`
