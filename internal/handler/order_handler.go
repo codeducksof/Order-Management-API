@@ -108,6 +108,40 @@ func (h *OrderHandler) ListOrders(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
+// DeleteOrder godoc
+// @Summary      Delete an order
+// @Tags         orders
+// @Security     BearerAuth
+// @Produce      json
+// @Param        id   path  string  true  "Order ID"
+// @Success      204
+// @Failure      404  {object}  map[string]string
+// @Failure      409  {object}  map[string]string
+// @Router       /orders/{id} [delete]
+func (h *OrderHandler) DeleteOrder(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	orderID := c.Param("id")
+	err := h.orderService.Delete(c.Request.Context(), orderID, userID)
+	if err != nil {
+		switch err {
+		case service.ErrOrderNotFound, service.ErrUnauthorized:
+			c.JSON(http.StatusNotFound, gin.H{"error": "order not found"})
+		case service.ErrCannotDeleteOrder:
+			c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		default:
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete order"})
+		}
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
 // UpdateOrderStatus godoc
 // @Summary      Update order status
 // @Tags         orders

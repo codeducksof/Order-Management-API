@@ -44,3 +44,7 @@ func (r *orderRepository) UpdateStatus(ctx context.Context, id string, status do
 		Where("id = ?", id).
 		Update("status", status).Error
 }
+
+func (r *orderRepository) Delete(ctx context.Context, id string) error {
+	return r.db.WithContext(ctx).Where("id = ?", id).Delete(&domain.Order{}).Error
+}

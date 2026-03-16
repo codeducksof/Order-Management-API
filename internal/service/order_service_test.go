@@ -281,6 +281,105 @@ func TestOrderService_GetByUserID(t *testing.T) {
 	}
 }
 
+func TestOrderService_Delete(t *testing.T) {
+	ctx := context.Background()
+
+	tests := []struct {
+		name          string
+		orderID       string
+		userID        string
+		setupMock     func(*mocks.MockOrderRepository, *mocks.MockOrderCache)
+		expectedError error
+	}{
+		{
+			name:    "successful delete pending order",
+			orderID: "order-123",
+			userID:  "user-123",
+			setupMock: func(repo *mocks.MockOrderRepository, cache *mocks.MockOrderCache) {
+				repo.On("GetByID", ctx, "order-123").Return(&domain.Order{
+					ID:     "order-123",
+					UserID: "user-123",
+					Status: domain.OrderStatusPending,
+				}, nil)
+				repo.On("Delete", ctx, "order-123").Return(nil)
+				cache.On("DeleteOrder", ctx, "order-123").Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:    "successful delete cancelled order",
+			orderID: "order-456",
+			userID:  "user-123",
+			setupMock: func(repo *mocks.MockOrderRepository, cache *mocks.MockOrderCache) {
+				repo.On("GetByID", ctx, "order-456").Return(&domain.Order{
+					ID:     "order-456",
+					UserID: "user-123",
+					Status: domain.OrderStatusCancelled,
+				}, nil)
+				repo.On("Delete", ctx, "order-456").Return(nil)
+				cache.On("DeleteOrder", ctx, "order-456").Return(nil)
+			},
+			expectedError: nil,
+		},
+		{
+			name:    "cannot delete confirmed order",
+			orderID: "order-123",
+			userID:  "user-123",
+			setupMock: func(repo *mocks.MockOrderRepository, cache *mocks.MockOrderCache) {
+				repo.On("GetByID", ctx, "order-123").Return(&domain.Order{
+					ID:     "order-123",
+					UserID: "user-123",
+					Status: domain.OrderStatusConfirmed,
+				}, nil)
+			},
+			expectedError: ErrCannotDeleteOrder,
+		},
+		{
+			name:    "order not found",
+			orderID: "nonexistent",
+			userID:  "user-123",
+			setupMock: func(repo *mocks.MockOrderRepository, cache *mocks.MockOrderCache) {
+				repo.On("GetByID", ctx, "nonexistent").Return(nil, gorm.ErrRecordNotFound)
+			},
+			expectedError: ErrOrderNotFound,
+		},
+		{
+			name:    "unauthorized - different user",
+			orderID: "order-123",
+			userID:  "other-user",
+			setupMock: func(repo *mocks.MockOrderRepository, cache *mocks.MockOrderCache) {
+				repo.On("GetByID", ctx, "order-123").Return(&domain.Order{
+					ID:     "order-123",
+					UserID: "user-123",
+					Status: domain.OrderStatusPending,
+				}, nil)
+			},
+			expectedError: ErrUnauthorized,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := mocks.NewMockOrderRepository()
+			mockCache := mocks.NewMockOrderCache()
+			mockExtAPI := mocks.NewMockExternalAPIClient()
+			tt.setupMock(mockRepo, mockCache)
+
+			svc := NewOrderService(mockRepo, mockCache, mockExtAPI)
+			err := svc.Delete(ctx, tt.orderID, tt.userID)
+
+			if tt.expectedError != nil {
+				assert.Equal(t, tt.expectedError, err)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			mockRepo.AssertExpectations(t)
+			mockCache.AssertExpectations(t)
+		})
+	}
+}
+
 func TestOrderService_UpdateStatus(t *testing.T) {
 	ctx := context.Background()
 

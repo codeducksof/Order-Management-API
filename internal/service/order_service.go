@@ -11,9 +11,10 @@ import (
 )
 
 var (
-	ErrOrderNotFound = errors.New("order not found")
-	ErrUnauthorized  = errors.New("unauthorized: order does not belong to user")
-	ErrInvalidStatus = errors.New("invalid order status")
+	ErrOrderNotFound    = errors.New("order not found")
+	ErrUnauthorized     = errors.New("unauthorized: order does not belong to user")
+	ErrInvalidStatus    = errors.New("invalid order status")
+	ErrCannotDeleteOrder = errors.New("only pending or cancelled orders can be deleted")
 )
 
 type OrderService struct {
@@ -126,6 +127,31 @@ func (s *OrderService) GetByUserID(ctx context.Context, userID string, limit, of
 		Limit:  limit,
 		Offset: offset,
 	}, nil
+}
+
+func (s *OrderService) Delete(ctx context.Context, orderID, userID string) error {
+	order, err := s.orderRepo.GetByID(ctx, orderID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrOrderNotFound
+		}
+		return err
+	}
+
+	if order.UserID != userID {
+		return ErrUnauthorized
+	}
+
+	if order.Status != domain.OrderStatusPending && order.Status != domain.OrderStatusCancelled {
+		return ErrCannotDeleteOrder
+	}
+
+	if err := s.orderRepo.Delete(ctx, orderID); err != nil {
+		return err
+	}
+
+	_ = s.orderCache.DeleteOrder(ctx, orderID)
+	return nil
 }
 
 func (s *OrderService) UpdateStatus(ctx context.Context, orderID, userID string, input UpdateOrderStatusInput) (*domain.Order, error) {

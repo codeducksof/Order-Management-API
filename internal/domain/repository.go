@@ -13,4 +13,5 @@ type OrderRepository interface {
 	GetByID(ctx context.Context, id string) (*Order, error)
 	GetByUserID(ctx context.Context, userID string, limit, offset int) ([]*Order, int64, error)
 	UpdateStatus(ctx context.Context, id string, status OrderStatus) error
+	Delete(ctx context.Context, id string) error
 }

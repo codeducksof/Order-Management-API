@@ -41,6 +41,7 @@ func setupRouter(
 		api.GET("/orders", orderHandler.ListOrders)
 		api.GET("/orders/:id", orderHandler.GetOrder)
 		api.PATCH("/orders/:id/status", orderHandler.UpdateOrderStatus)
+		api.DELETE("/orders/:id", orderHandler.DeleteOrder)
 	}
 
 	return router

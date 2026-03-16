@@ -72,6 +72,11 @@ func (m *MockOrderRepository) UpdateStatus(ctx context.Context, id string, statu
 	return args.Error(0)
 }
 
+func (m *MockOrderRepository) Delete(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 // MockOrderCache is a mock implementation of domain.OrderCache.
 type MockOrderCache struct {
 	mock.Mock

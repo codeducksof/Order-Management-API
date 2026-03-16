@@ -113,6 +113,7 @@ make run
 | GET | `/api/orders` | ดู order ทั้งหมดของ user |
 | GET | `/api/orders/:id` | ดู order ตาม ID |
 | PATCH | `/api/orders/:id/status` | อัปเดตสถานะ order |
+| DELETE | `/api/orders/:id` | ลบ order (เฉพาะ `pending` หรือ `cancelled`) |
 
 ### Health Checks
 
@@ -182,6 +183,16 @@ curl -X PATCH http://localhost:8080/api/orders/<ORDER_ID>/status \
 ```
 
 Valid statuses: `pending` → `confirmed` → `shipped` → `delivered` / `cancelled`
+
+### 7. Delete Order
+
+```bash
+curl -X DELETE http://localhost:8080/api/orders/<ORDER_ID> \
+  -H "Authorization: Bearer $TOKEN"
+# 204 No Content
+```
+
+> สามารถลบได้เฉพาะ order ที่มีสถานะ `pending` หรือ `cancelled` เท่านั้น
 
 ---
 
@@ -257,6 +268,7 @@ make docker-down    # Stop all Docker services
 | `USER_EXISTS` | 409 | Email already registered |
 | `RATE_LIMITED` | 429 | Too many requests |
 | `INTERNAL_ERROR` | 500 | Server error |
+| (conflict message) | 409 | Cannot delete non-pending/cancelled order |
 
 ---
 
